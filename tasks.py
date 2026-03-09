@@ -1,16 +1,23 @@
-from crewai import Task
-from agents import single_trip_agent, distance_calculator, travel_agent
+#===================================================================
+# Tasks for Route Cost Calculator AI
+#This module defines the tasks for calculating travel distance and cost.
+# Has few-shot examples to guide the agents on how to use the tools and respond to user queries.
+#===================================================================
+
+# Required imports
+from crewai import Task # for defining tasks
+from agents import single_trip_agent, distance_calculator, travel_agent # import agents for each task
 
 
-# =======================================
-# Task 0: Conversational Travel Assistant
-# =======================================
+# ============================================================
+# Trip Distance & Cost Bot - Conversation Task
+# =============================================================
 
 conversation_task = Task(
     description="""
 User query: {user_input}
 
-You are a conversational travel assistant.
+You are a conversational Trip Distance & Cost Bot.
 
 Your job is to help the user calculate travel distance and cost.
 
@@ -58,10 +65,10 @@ OR
 
 
 # =======================================
-# Task 1: Distance Conversion
+# Distance Calculation tasks
 # =======================================
 
-# Distance Task optimized
+# Distance Task 
 distance_task = Task(
     description="""
 Convert the given distance into the requested unit.
@@ -91,10 +98,10 @@ Return:
 )
 
 # =======================================
-# Task 2: Travel Cost Calculation
+#  Travel Cost Calculation
 # =======================================
 
-# Travel Cost Task optimized
+# Travel Cost Task 
 travel_cost_task = Task(
     description="""
 Calculate travel cost.
