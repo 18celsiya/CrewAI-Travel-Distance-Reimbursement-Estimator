@@ -1,10 +1,17 @@
+# main.py
+import sys
+print("Python executable:", sys.executable)
+
 import streamlit as st
 import pandas as pd
-from tools import get_city_distance
 import io
+from crewai import Crew
+from agents import single_trip_agent, distance_calculator, travel_agent
+from tasks import conversation_task, distance_task, travel_cost_task
+from tools import get_city_distance
 
 # ------------------------------
-# 1️⃣ Page Config
+# Page Config
 # ------------------------------
 st.set_page_config(
     page_title="Route Distance & Cost Estimator",
@@ -14,30 +21,21 @@ st.set_page_config(
 )
 
 # ------------------------------
-# 2️⃣ Custom CSS
+# Custom CSS
 # ------------------------------
 st.markdown("""
 <style>
 body { background-color: #0E1117; font-family: 'Helvetica', sans-serif; }
-h1 {
-    color: #FFD700 !important;
-    text-align: center;
-    font-size: 3rem;
-    font-weight: bold;
-}
-h2 { color: #FAFAFA; margin-bottom: 10px; }
-div.stAlert > div[data-baseweb="alert"] > div { background-color: #262730; color: #FFD700; font-weight: bold; }
-.stButton>button { background-color: #FFD700; color: #0E1117; border-radius:12px; padding:10px 24px; font-size:16px; font-weight:bold; }
+h1 { color: #FFD700 !important; text-align: center; font-size: 3rem; font-weight: bold; }
+.stButton>button { background-color: #FFD700; color: #0E1117; border-radius:12px; padding:10px 24px; font-size:16px; font-weight:bold; width: 100%; }
 .stDownloadButton>button { background-color: #1E90FF; color:#FAFAFA; border-radius:12px; padding:10px 24px; font-size:16px; font-weight:bold; }
 .stSelectbox, .stTextInput, .stRadio, .stFileUploader > div > div > input { border-radius:12px; background-color:#262730; color:#FAFAFA; }
 .dataframe tbody tr:hover { background-color: #1a1c23; }
-.invalid { color: red; font-weight: bold; }
-.valid { color: #32CD32; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# 3️⃣ Main Heading
+# Main Heading
 # ------------------------------
 st.markdown("""
 <div style="display: flex; align-items: center; justify-content: center; gap: 30px;">
@@ -47,7 +45,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------
-# 4️⃣ Select Mode
+# Mode Selection
 # ------------------------------
 mode = st.selectbox(
     "Select Calculation Mode:",
@@ -55,41 +53,59 @@ mode = st.selectbox(
 )
 
 # ------------------------------
-# 5️⃣ Single Trip Mode
+# Single Trip Crew
 # ------------------------------
-if mode == 'Single Trip Between Two Cities':
-    st.subheader("Single Trip: Distance & Travel Cost")
-    starting_address_value = st.text_input("Enter starting address:", value="Delhi")
-    destination_address_value = st.text_input("Enter destination address:", value="Chennai")
-    transport_mode = st.selectbox(
-        "Mode of transport:",
-        ['car', 'bike', 'foot', 'hgv']
+if 'conversation_crew' not in st.session_state:
+    st.session_state.conversation_crew = Crew(
+        agents=[single_trip_agent],
+        tasks=[conversation_task],
+        verbose=True
     )
-    distance_unit = st.selectbox('Distance unit:', ['km','miles']).lower()
-    cost_rate_input = st.text_input("Travel cost per unit distance:", value="200")
+conversation_crew = st.session_state.conversation_crew
 
-    if st.button("Calculate Distance & Travel Cost"):
-        distance_value = get_city_distance.run(
-            starting_address=starting_address_value,
-            destination_address=destination_address_value,
-            mode_of_transport=transport_mode,
-            given_unit=distance_unit
-        )
-        if distance_value != "Distance not found":
-            try:
-                distance_float = float(distance_value)
-                travel_cost = distance_float * float(cost_rate_input)
-                st.success(f"Distance: {distance_float} {distance_unit}")
-                st.success(f"Estimated Travel Cost: {travel_cost}")
-            except ValueError:
-                st.error("Error converting distance or cost.")
+# ------------------------------
+# Single Trip Mode
+# ------------------------------
+if mode == "Single Trip Between Two Cities":
+    st.subheader("💬 Interactive Travel Assistant")
+
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
+
+    # Display previous messages
+    for speaker, text in st.session_state.conversation_history:
+        if speaker == "You":
+            with st.chat_message("user"):
+                st.write(text)
         else:
-            st.error("Distance not found between the given addresses.")
+            with st.chat_message("assistant"):
+                st.write(text)
+
+    # Chat Input
+    user_input = st.chat_input("Ask your questions related to travel or cost")
+
+    if user_input:
+        with st.chat_message("user"):
+            st.write(user_input)
+        st.session_state.conversation_history.append(("You", user_input))
+
+        with st.spinner("Processing..."):
+            try:
+                result = conversation_crew.kickoff({
+                    "user_input": user_input
+                })
+                response = str(result)
+            except Exception as e:
+                response = f"Error: {e}"
+
+        with st.chat_message("assistant"):
+            st.write(response)
+        st.session_state.conversation_history.append(("Assistant", response))
 
 # ------------------------------
-# 6️⃣ Batch Mode
+# Batch Mode
 # ------------------------------
-else:
+if mode == "Batch Calculation via CSV/Excel":
     file_type = st.selectbox("Select file type:", ['CSV', 'Excel'])
     upload_file = st.file_uploader(f"Upload your {file_type} file:", type=['csv','xlsx'])
 
@@ -113,41 +129,56 @@ else:
                 use_destination_column = True
 
             transport_mode = st.selectbox("Mode of transport:", [
-                'driving-car','driving-hgv','foot-walking','foot-hiking',
-                'cycling-regular','cycling-road','cycling-mountain','cycling-electric'
+                "car", "bike", "foot", "bus", "train", "truck"
             ])
 
         df['Distance'] = None
         df['Travel Cost'] = None
 
         if st.button("Calculate Distance & Travel Cost"):
+
+            # --------------------------
+            # Create Crews
+            # --------------------------
+            distance_crew = Crew(agents=[distance_calculator], tasks=[distance_task], verbose=True)
+            cost_crew = Crew(agents=[travel_agent], tasks=[travel_cost_task], verbose=True)
+
             for idx, row in df.iterrows():
                 start_val = row[starting_address_column]
                 dest_val = row[destination_address_column] if use_destination_column else fixed_destination_address
 
-                distance_value = get_city_distance.run(
+                # 1️⃣ Get exact distance from tool
+                distance_meters = get_city_distance.run(
                     starting_address=start_val,
                     destination_address=dest_val,
-                    mode_of_transport=transport_mode,
-                    given_unit=distance_unit
+                    mode_of_transport=transport_mode
                 )
 
-                if distance_value != "Distance not found":
-                    try:
-                        distance_float = float(distance_value)
-                        travel_cost = distance_float * float(cost_rate_input)
-                        df.at[idx, "Distance"] = f"{distance_float} {distance_unit}"
-                        df.at[idx, "Travel Cost"] = f"{travel_cost}"
-                    except ValueError:
-                        df.at[idx, "Distance"] = "NA"
-                        df.at[idx, "Travel Cost"] = "NA"
-                else:
-                    df.at[idx, "Distance"] = "NA"
-                    df.at[idx, "Travel Cost"] = "NA"
+                # 2️⃣ Ask LLM to convert distance to km/miles
+                converted_distance = distance_crew.kickoff({
+                    "starting_address": start_val,
+                    "destination_address": dest_val,
+                    "distance_in_meters": distance_meters,  # exact number
+                    "unit": distance_unit,
+                    "mode_of_transport": transport_mode  # pass the mode here
+                })
+
+                # 3️⃣ Calculate travel cost
+                travel_cost_result = cost_crew.kickoff({
+                    "distance_with_units": str(converted_distance),  # "1345.67 km"
+                    "cost_rate": cost_rate_input,
+                    "country": "India"
+                })
+
+                # 4️⃣ Store results
+                df.at[idx, "Distance"] = str(converted_distance)
+                df.at[idx, "Travel Cost"] = str(travel_cost_result)
 
             st.success("Processing complete!")
 
+            # ------------------------------
             # Highlight invalid distances
+            # ------------------------------
             def highlight_invalid(val):
                 if val == "NA":
                     return 'color: red; font-weight:bold'
@@ -156,10 +187,9 @@ else:
             st.dataframe(df.style.applymap(highlight_invalid, subset=["Distance"]))
 
             # ------------------------------
-            # Download button + GIF inline properly
+            # Download button
             # ------------------------------
-            col_button, col_gif = st.columns([4,1])  # 4:1 ratio
-
+            col_button, col_gif = st.columns([4,1])
             with col_button:
                 if file_type=='CSV':
                     output_data = df.to_csv(index=False).encode('utf-8')

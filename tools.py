@@ -1,60 +1,70 @@
-# tools.py
 import os
+import requests
 from crewai.tools import tool
-from graphh import GraphHopper
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize GraphHopper client with your API key
-mapper = GraphHopper(api_key=os.getenv("GRAPHHOPPER_API_KEY"))
+GRAPHOPPER_API_KEY = os.getenv("GRAPHHOPPER_API_KEY")
 
 @tool("get_city_distance")
 def get_city_distance(
     starting_address: str,
     destination_address: str,
-    mode_of_transport: str = "car",  # car, bike, foot
-    given_unit: str = "km"
-) -> float:
+    mode_of_transport: str = "car"  # car, bike, foot
+):
     """
-    Returns the distance between two addresses using GraphHopper API.
-
-    Parameters:
-    - starting_address: str, origin address
-    - destination_address: str, destination address
-    - mode_of_transport: str, vehicle type ('car', 'bike', 'foot')
-    - given_unit: str, 'km' or 'miles'
-
-    Returns:
-    - float: distance between two locations in the requested unit
-    - str: 'Distance not found' if geocoding or routing fails
+    Returns the distance in meters between two addresses using GraphHopper REST API.
     """
     try:
-        # Convert addresses to lat/long
-        origin = mapper.address_to_latlong(starting_address)
-        destination = mapper.address_to_latlong(destination_address)
-        print("Origin:", origin)
-        print("Destination:", destination)
+        # ----------------------------
+        # Step 1: Geocode addresses
+        # ----------------------------
+        def geocode(address):
+            url = "https://graphhopper.com/api/1/geocode"
+            params = {
+                "q": address,
+                "limit": 1,
+                "locale": "en",
+                "key": GRAPHOPPER_API_KEY
+            }
+            resp = requests.get(url, params=params)
+            data = resp.json()
+            if "hits" in data and len(data["hits"]) > 0:
+                lat = data["hits"][0]["point"]["lat"]
+                lng = data["hits"][0]["point"]["lng"]
+                return f"{lat},{lng}"
+            else:
+                raise ValueError(f"Geocoding failed for address: {address}")
 
-        if not origin or not destination:
-            return "Distance not found"
+        origin = geocode(starting_address)
+        destination = geocode(destination_address)
 
-        # Get the route using the selected vehicle
-        route_data = mapper.route([origin, destination], vehicle=mode_of_transport)
+        # ----------------------------
+        # Step 2: Request route
+        # ----------------------------
+        route_url = "https://graphhopper.com/api/1/route"
+        route_params = {
+            "point": [origin, destination],
+            "profile": mode_of_transport,
+            "calc_points": "false",
+            "weighting": "fastest",  # match GraphHopper Map UI
+            "key": GRAPHOPPER_API_KEY
+        }
 
-        # Extract distance in meters from the first path
-        distance_meters = route_data['paths'][0]['distance']
+        route_resp = requests.get(route_url, params=route_params)
+        route_data = route_resp.json()
 
-        # Convert to km or miles
-        if given_unit.lower() == "km":
-            distance = distance_meters / 1000
-        elif given_unit.lower() == "miles":
-            distance = (distance_meters / 1000) * 0.621371
+        # ----------------------------
+        # Step 3: Extract distance in meters
+        # ----------------------------
+        if "paths" in route_data and len(route_data["paths"]) > 0:
+            distance_meters = route_data["paths"][0]["distance"]
+            return distance_meters
         else:
-            distance = distance_meters / 1000  # default km
-
-        return round(distance, 2)
+            print(f"No route found for: {starting_address} → {destination_address}")
+            return None
 
     except Exception as e:
         print("Distance calculation error:", e)
-        return "Distance not found"
+        return None
