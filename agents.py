@@ -9,22 +9,22 @@ import os # for environment variables
 from crewai import Agent, LLM # for defining agents and language model
 from crewai.memory import Memory # for agent memory
 from tools import get_city_distance # load the tool to get city distance
+import math
+import time
 
 # Load environment variables from .env file
 load_dotenv()
 
-
-# ------------------------------------------
-# LLM configuration
-# -------------------------------------------
+# LLM configuration - Qroq Compound Mini for all agents
 llm = LLM(
-    provider="openrouter",  # MUST specify the provider
-    model="openai/gpt-4o",              # OpenRouter model name
-    api_key=os.getenv("OPENROUTER_API_KEY"),
-    base_url="https://openrouter.ai/api/v1",
+    provider="groq",
+    model="groq/compound-mini",
+    api_key=os.getenv("GROQ_API_KEY"),
+    base_url="https://api.groq.cloud/v1",
     temperature=0,
-    max_tokens=200
+    max_tokens=500
 )
+
 
 # ------------------------------------------
 # Memory configuration
@@ -65,7 +65,6 @@ llm = llm,
     tools=[get_city_distance],
     temperature=0,
     verbose=True,
-    memory=False,
     max_execution_time=1200,
     memory=distance_memory
 )
