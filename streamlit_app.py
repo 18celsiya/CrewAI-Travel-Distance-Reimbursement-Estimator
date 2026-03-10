@@ -19,7 +19,7 @@ from tools import get_city_distance
 
 # Set Streamlit page configuration
 st.set_page_config(
-    page_title="Route Distance & Cost Estimator",
+    page_title="AI-Powered Route Distance & Travel Reimbursement Estimator",
     page_icon="🚗",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -41,7 +41,7 @@ h1 { color: #FFD700 !important; text-align: center; font-size: 3rem; font-weight
 st.markdown("""
 <div style="display: flex; align-items: center; justify-content: center; gap: 30px;">
     <img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbzF6b3Vnb2U3Ymh4aGNycGJjYnJhbHpieG16aHp1MWhjcGQ5ZjE1eSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/4T1yKz1IpdcvCi9o6e/giphy.gif" width="60"/>
-    <h1>Route Distance & Cost Estimator</h1>
+    <h1>AI-Powered Route Distance & Travel Reimbursement Estimator</h1>
 </div>
 """, unsafe_allow_html=True)
 
