@@ -24,7 +24,7 @@ Rules:
    km = meters / 1000
    miles = meters / 1609.34
    Round to 2 decimals.
-7. Ask user if they want to calculate cost per unit.
+7. 7. Ask the user if they want to calculate the reimbursement amount by providing the cost per kilometer.
 8. Respond conversationally and remember previous conversation using memory.
 """,
     agent=single_trip_agent,
