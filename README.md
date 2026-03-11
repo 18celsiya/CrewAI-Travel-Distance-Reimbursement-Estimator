@@ -183,7 +183,6 @@ Possible improvements for this project:
 - Add asynchronous processing for faster CSV batch execution
 - Integrate address validation before sending requests to the routing API
 - Implement rule-based reimbursement policies based on region or postcode
-- Improve error handling for invalid location inputs
 
 ---
 
@@ -223,9 +222,7 @@ streamlit run main.py
 # 👨‍💻 Author
 
 Built as a learning project to explore:
-
 - AI Agents
 - Automation workflows
 - Tool orchestration with CrewAI
-
-If you have suggestions or feedback, feel free to comment!
+- End-to-end streamlit deployment
